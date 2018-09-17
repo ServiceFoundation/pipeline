@@ -185,11 +185,20 @@ func main() {
 	auth.Install(router)
 
 	basePath := viper.GetString("pipeline.basepath")
+
+	authoriozer := auth.NewAuthorizer(casbinDSN)
+
+	dashboard := router.Group(basePath + "/dashboard/orgs")
+	dashboard.Use(auth.Handler)
+	dashboard.Use(authoriozer)
+	dashboard.Use(api.OrganizationMiddleware)
+	dashboard.GET("/:orgid/clusters", api.GetDashboard)
+
 	v1 := router.Group(basePath + "/api/v1/")
 	v1.GET("/functions", api.ListFunctions)
 	{
 		v1.Use(auth.Handler)
-		v1.Use(auth.NewAuthorizer(casbinDSN))
+		v1.Use(authoriozer)
 		orgs := v1.Group("/orgs")
 		{
 			orgs.Use(api.OrganizationMiddleware)
@@ -203,6 +212,7 @@ func main() {
 
 			orgs.POST("/:orgid/clusters", api.CreateClusterRequest)
 			//v1.GET("/status", api.Status)
+			orgs.GET("/:orgid/dashboard/clusters", api.GetDashboard)
 			orgs.GET("/:orgid/clusters", api.GetClusters)
 			orgs.GET("/:orgid/clusters/:id", api.GetClusterStatus)
 			orgs.GET("/:orgid/clusters/:id/details", api.GetClusterDetails)
