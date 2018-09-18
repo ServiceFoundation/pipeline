@@ -22,16 +22,20 @@ import (
 	"github.com/banzaicloud/go-gin-prometheus"
 	"github.com/banzaicloud/pipeline/api"
 	"github.com/banzaicloud/pipeline/auth"
+	"github.com/banzaicloud/pipeline/cluster"
 	"github.com/banzaicloud/pipeline/config"
 	"github.com/banzaicloud/pipeline/dns"
 	"github.com/banzaicloud/pipeline/dns/route53/model"
 	"github.com/banzaicloud/pipeline/internal/audit"
+	intCluster "github.com/banzaicloud/pipeline/internal/cluster"
 	"github.com/banzaicloud/pipeline/internal/platform/gin/correlationid"
 	ginlog "github.com/banzaicloud/pipeline/internal/platform/gin/log"
 	"github.com/banzaicloud/pipeline/model"
 	"github.com/banzaicloud/pipeline/model/defaults"
 	"github.com/banzaicloud/pipeline/notify"
 	"github.com/banzaicloud/pipeline/objectstore"
+	"github.com/banzaicloud/pipeline/pkg/providers"
+	"github.com/banzaicloud/pipeline/secret"
 	"github.com/banzaicloud/pipeline/spotguide"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -155,6 +159,14 @@ func main() {
 		if err != nil {
 			errorHandler.Handle(errors.Wrap(err, "failed to scrape Spotguide repositories"))
 		}
+	}()
+
+	go func() {
+		clusters := intCluster.NewClusters(config.DB())
+		secretValidator := providers.NewSecretValidator(secret.Store)
+		clusterManager := cluster.NewManager(clusters, secretValidator, log, errorHandler)
+
+		cluster.RetryPendingOperations(clusterManager, log)
 	}()
 
 	//Initialise Gin router
